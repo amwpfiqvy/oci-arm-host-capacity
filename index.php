@@ -63,15 +63,18 @@ if (!empty($missing)) {
     exit(1);
 }
 
-// Configuración con tamaño de disco de 200GB
-$bootVolumeSize = getenv('OCI_BOOT_VOLUME_SIZE_IN_GBS') ?: '200';
+// Configuración de instancia (leída de .env / variables de entorno)
+$ocpus = (int) (getenv('OCI_OCPUS') ?: '1');
+$memoryInGbs = (int) (getenv('OCI_MEMORY_IN_GBS') ?: '6');
+$maxInstances = (int) (getenv('OCI_MAX_INSTANCES') ?: '1');
+$bootVolumeSize = getenv('OCI_BOOT_VOLUME_SIZE_IN_GBS') ?: '50';
 
 echo "OCI ARM Host Capacity Checker\n";
 echo "Region: " . getenv('OCI_REGION') . "\n";
 echo "Shape: VM.Standard.A1.Flex\n";
-echo "OCPUs: 4, Memory: 24GB\n";
+echo "OCPUs: {$ocpus}, Memory: {$memoryInGbs}GB\n";
 echo "Boot Volume Size: {$bootVolumeSize}GB\n";
-echo "Max instances: 1\n";
+echo "Max instances: {$maxInstances}\n";
 echo "---\n";
 
 $config = new OciConfig(
@@ -83,13 +86,12 @@ $config = new OciConfig(
     getenv('OCI_AVAILABILITY_DOMAIN') ?: null,
     getenv('OCI_SUBNET_ID'),
     getenv('OCI_IMAGE_ID'),
-    4,
-    24,
-    $bootVolumeSize  // <-- NUEVO: Tamaño de disco
+    $ocpus,
+    $memoryInGbs,
+    $bootVolumeSize
 );
 
 $shape = 'VM.Standard.A1.Flex';
-$maxInstances = 1;
 $sshKey = getenv('OCI_SSH_PUBLIC_KEY');
 
 $api = new OciApi($config);

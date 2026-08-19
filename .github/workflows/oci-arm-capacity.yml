@@ -2,8 +2,11 @@ name: OCI ARM Host Capacity Checker
 
 on:
   schedule:
-    - cron: '*/2 * * * *'  # Cambiado de */5 a */2 (cada 2 minutos)
+    - cron: '*/6 * * * *'  # 每 6 分钟
   workflow_dispatch:
+
+permissions:
+  actions: write   # 抢机成功后 gh workflow disable 需要
 
 concurrency:
   group: oci-capacity-check
@@ -12,21 +15,21 @@ concurrency:
 jobs:
   check-capacity:
     runs-on: ubuntu-latest
-    timeout-minutes: 3  # Reducido de 5 a 3 minutos
-    
+    timeout-minutes: 5
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
         php-version: '8.1'
         extensions: curl, json, openssl
-        
+
     - name: Install dependencies
       run: composer install --no-interaction --prefer-dist --no-progress
-      
+
     - name: Setup OCI private key
       run: |
         mkdir -p ~/.oci
@@ -34,7 +37,7 @@ jobs:
         chmod 600 ~/.oci/key.pem
       env:
         OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
-        
+
     - name: Create .env file
       run: |
         echo "OCI_REGION=$OCI_REGION" > .env
@@ -44,11 +47,11 @@ jobs:
         echo "OCI_PRIVATE_KEY_FILENAME=/home/runner/.oci/key.pem" >> .env
         echo "OCI_SUBNET_ID=$OCI_SUBNET_ID" >> .env
         echo "OCI_IMAGE_ID=$OCI_IMAGE_ID" >> .env
-        echo "OCI_OCPUS=4" >> .env
-        echo "OCI_MEMORY_IN_GBS=24" >> .env
+        echo "OCI_OCPUS=1" >> .env
+        echo "OCI_MEMORY_IN_GBS=6" >> .env
         echo "OCI_MAX_INSTANCES=1" >> .env
         echo "OCI_SHAPE=VM.Standard.A1.Flex" >> .env
-        echo "OCI_BOOT_VOLUME_SIZE_IN_GBS=200" >> .env
+        echo "OCI_BOOT_VOLUME_SIZE_IN_GBS=50" >> .env
         echo "OCI_SSH_PUBLIC_KEY=$OCI_SSH_PUBLIC_KEY" >> .env
       env:
         OCI_REGION: ${{ secrets.OCI_REGION }}
@@ -58,10 +61,25 @@ jobs:
         OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
         OCI_IMAGE_ID: ${{ secrets.OCI_IMAGE_ID }}
         OCI_SSH_PUBLIC_KEY: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
-        
+
     - name: Run capacity check
-      run: php index.php
-      
+      id: capacity
+      run: |
+        set -o pipefail
+        php index.php 2>&1 | tee capacity-run.log
+        # 成功抢到实例（SUCCESS!）或已存在目标数量实例（Already have）时标记完成
+        if grep -qE 'SUCCESS!|Already have' capacity-run.log; then
+          echo "done=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Disable workflow after success (prevent Actions quota abuse / account ban)
+      if: steps.capacity.outputs.done == 'true'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "::notice::Instance created (or already present). Disabling this scheduled workflow."
+        gh workflow disable "oci-arm-capacity.yml" --repo "$GITHUB_REPOSITORY"
+
     - name: Upload log artifact
       if: always()
       uses: actions/upload-artifact@v4
