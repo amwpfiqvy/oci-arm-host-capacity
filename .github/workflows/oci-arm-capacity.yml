@@ -131,6 +131,40 @@ jobs:
         Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
         EOF
 
+    - name: Send ServerChan notification
+      if: steps.capacity.outputs.created == 'true'
+      continue-on-error: true
+      env:
+        SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+        OCI_REGION: ${{ secrets.OCI_REGION }}
+      run: |
+        if [ -z "$SERVERCHAN_SENDKEY" ]; then
+          echo "::warning::ServerChan notification skipped because SERVERCHAN_SENDKEY is missing."
+          exit 0
+        fi
+
+        DESP=$(cat <<EOF
+        新的 OCI ARM 实例已成功创建。
+
+        - Region: ${OCI_REGION}
+        - Shape: VM.Standard.A1.Flex
+        - Resources: 1 OCPU / 6 GB memory
+        - Workflow: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+        EOF
+        )
+
+        RESPONSE=$(curl --silent --show-error --fail-with-body \
+          --request POST \
+          --url "https://sctapi.ftqq.com/${SERVERCHAN_SENDKEY}.send" \
+          --data-urlencode "title=OCI ARM 抢机成功" \
+          --data-urlencode "desp=${DESP}")
+
+        echo "$RESPONSE"
+        if ! jq -e '.code == 0' <<< "$RESPONSE" > /dev/null; then
+          echo "::error::ServerChan returned an unsuccessful response."
+          exit 1
+        fi
+
     - name: Disable workflow after success (prevent Actions quota abuse / account ban)
       if: steps.capacity.outputs.done == 'true'
       env:

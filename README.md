@@ -71,6 +71,16 @@ Después de crear una instancia, el workflow puede enviar un correo mediante SMT
 
 Con Gmail debes usar una **contraseña de aplicación**, no la contraseña normal de la cuenta. Si estos secrets no están configurados, la notificación se omite y el workflow continúa funcionando.
 
+#### 2.4 Configurar notificaciones de ServerChan (opcional)
+
+Inicia sesión en [ServerChan](https://sct.ftqq.com/sendkey), genera un SendKey y añade este secret en **Settings** → **Secrets and variables** → **Actions**:
+
+| Nombre del Secret | Descripción |
+|-------------------|-------------|
+| `SERVERCHAN_SENDKEY` | SendKey de ServerChan, normalmente comienza con `SCT` |
+
+Cuando se cree una instancia nueva, el workflow enviará una notificación mediante ServerChan. Si el secret no está configurado, la notificación se omite sin afectar al workflow.
+
 ---
 
 ### Paso 3: Activar el Workflow
