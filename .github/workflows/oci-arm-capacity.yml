@@ -10,6 +10,11 @@ on:
         required: false
         default: false
         type: boolean
+      test_serverchan:
+        description: 'Only send a ServerChan test notification; do not access OCI'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: write   # 抢机成功后 gh workflow disable 需要
@@ -25,22 +30,22 @@ jobs:
 
     steps:
     - name: Checkout code
-      if: ${{ !inputs.test_email }}
+      if: ${{ !inputs.test_email && !inputs.test_serverchan }}
       uses: actions/checkout@v4
 
     - name: Setup PHP
-      if: ${{ !inputs.test_email }}
+      if: ${{ !inputs.test_email && !inputs.test_serverchan }}
       uses: shivammathur/setup-php@v2
       with:
         php-version: '8.1'
         extensions: curl, json, openssl
 
     - name: Install dependencies
-      if: ${{ !inputs.test_email }}
+      if: ${{ !inputs.test_email && !inputs.test_serverchan }}
       run: composer install --no-interaction --prefer-dist --no-progress
 
     - name: Setup OCI private key
-      if: ${{ !inputs.test_email }}
+      if: ${{ !inputs.test_email && !inputs.test_serverchan }}
       run: |
         mkdir -p ~/.oci
         printf '%s' "$OCI_PRIVATE_KEY" > ~/.oci/key.pem
@@ -49,7 +54,7 @@ jobs:
         OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
 
     - name: Create .env file
-      if: ${{ !inputs.test_email }}
+      if: ${{ !inputs.test_email && !inputs.test_serverchan }}
       run: |
         echo "OCI_REGION=$OCI_REGION" > .env
         echo "OCI_USER_ID=$OCI_USER_ID" >> .env
@@ -74,7 +79,7 @@ jobs:
         OCI_SSH_PUBLIC_KEY: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
 
     - name: Run capacity check
-      if: ${{ !inputs.test_email }}
+      if: ${{ !inputs.test_email && !inputs.test_serverchan }}
       id: capacity
       run: |
         set -o pipefail
@@ -132,19 +137,32 @@ jobs:
         EOF
 
     - name: Send ServerChan notification
-      if: steps.capacity.outputs.created == 'true'
-      continue-on-error: true
+      if: steps.capacity.outputs.created == 'true' || inputs.test_serverchan
+      continue-on-error: ${{ !inputs.test_serverchan }}
       env:
+        TEST_SERVERCHAN: ${{ inputs.test_serverchan }}
         SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
         OCI_REGION: ${{ secrets.OCI_REGION }}
       run: |
         if [ -z "$SERVERCHAN_SENDKEY" ]; then
+          if [ "$TEST_SERVERCHAN" = "true" ]; then
+            echo "::error::SERVERCHAN_SENDKEY is missing."
+            exit 1
+          fi
           echo "::warning::ServerChan notification skipped because SERVERCHAN_SENDKEY is missing."
           exit 0
         fi
 
+        if [ "$TEST_SERVERCHAN" = "true" ]; then
+          SERVERCHAN_TITLE="OCI ARM Server酱通知测试"
+          SERVERCHAN_MESSAGE="这是一条测试通知，没有执行任何 OCI 实例操作。"
+        else
+          SERVERCHAN_TITLE="OCI ARM 抢机成功"
+          SERVERCHAN_MESSAGE="新的 OCI ARM 实例已成功创建。"
+        fi
+
         DESP=$(cat <<EOF
-        新的 OCI ARM 实例已成功创建。
+        ${SERVERCHAN_MESSAGE}
 
         - Region: ${OCI_REGION}
         - Shape: VM.Standard.A1.Flex
@@ -156,7 +174,7 @@ jobs:
         RESPONSE=$(curl --silent --show-error --fail-with-body \
           --request POST \
           --url "https://sctapi.ftqq.com/${SERVERCHAN_SENDKEY}.send" \
-          --data-urlencode "title=OCI ARM 抢机成功" \
+          --data-urlencode "title=${SERVERCHAN_TITLE}" \
           --data-urlencode "desp=${DESP}")
 
         echo "$RESPONSE"
