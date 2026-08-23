@@ -67,10 +67,48 @@ jobs:
       run: |
         set -o pipefail
         php index.php 2>&1 | tee capacity-run.log
-        # 成功抢到实例（SUCCESS!）或已存在目标数量实例（Already have）时标记完成
-        if grep -qE 'SUCCESS!|Already have' capacity-run.log; then
+        # 仅新建实例时发送通知；新建成功或已达目标数量时停用 workflow
+        if grep -q 'SUCCESS!' capacity-run.log; then
+          echo "created=true" >> "$GITHUB_OUTPUT"
+          echo "done=true" >> "$GITHUB_OUTPUT"
+        elif grep -q 'Already have' capacity-run.log; then
           echo "done=true" >> "$GITHUB_OUTPUT"
         fi
+
+    - name: Send success email
+      if: steps.capacity.outputs.created == 'true'
+      continue-on-error: true
+      env:
+        SMTP_URL: ${{ secrets.SMTP_URL }}
+        SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+        SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        SMTP_FROM: ${{ secrets.SMTP_FROM }}
+        SMTP_TO: ${{ secrets.SMTP_TO }}
+      run: |
+        if [ -z "$SMTP_URL" ] || [ -z "$SMTP_USERNAME" ] || [ -z "$SMTP_PASSWORD" ] || [ -z "$SMTP_FROM" ] || [ -z "$SMTP_TO" ]; then
+          echo "::warning::Email notification skipped because one or more SMTP secrets are missing."
+          exit 0
+        fi
+
+        curl --silent --show-error --fail --ssl-reqd \
+          --url "$SMTP_URL" \
+          --user "$SMTP_USERNAME:$SMTP_PASSWORD" \
+          --mail-from "$SMTP_FROM" \
+          --mail-rcpt "$SMTP_TO" \
+          --upload-file - <<EOF
+        From: OCI ARM Capacity Checker <$SMTP_FROM>
+        To: $SMTP_TO
+        Subject: OCI ARM instance created successfully
+        Content-Type: text/plain; charset=UTF-8
+
+        A new OCI ARM instance was created successfully.
+
+        Region: ${{ secrets.OCI_REGION }}
+        Shape: VM.Standard.A1.Flex
+        Resources: 1 OCPU / 6 GB memory
+        Repository: $GITHUB_REPOSITORY
+        Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+        EOF
 
     - name: Disable workflow after success (prevent Actions quota abuse / account ban)
       if: steps.capacity.outputs.done == 'true'

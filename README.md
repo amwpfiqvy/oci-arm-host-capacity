@@ -57,6 +57,20 @@ Debes crear estos 6 secrets uno por uno:
 
 ✅ **Resultado:** Tienes 8 secrets configurados (los 6 de arriba + OCI_IMAGE_ID + OCI_SSH_PUBLIC_KEY que ya están preconfigurados en el workflow)
 
+#### 2.3 Configurar notificaciones por correo (opcional)
+
+Después de crear una instancia, el workflow puede enviar un correo mediante SMTP. Añade estos secrets en **Settings** → **Secrets and variables** → **Actions**:
+
+| Nombre del Secret | Ejemplo | Descripción |
+|-------------------|---------|-------------|
+| `SMTP_URL` | `smtps://smtp.gmail.com:465` | URL SMTP. También puedes usar `smtp://smtp.gmail.com:587` para STARTTLS |
+| `SMTP_USERNAME` | `tu-correo@gmail.com` | Usuario SMTP |
+| `SMTP_PASSWORD` | `contraseña-de-aplicación` | Contraseña SMTP o contraseña de aplicación |
+| `SMTP_FROM` | `tu-correo@gmail.com` | Dirección del remitente |
+| `SMTP_TO` | `tu-correo-personal@ejemplo.com` | Dirección que recibirá la notificación |
+
+Con Gmail debes usar una **contraseña de aplicación**, no la contraseña normal de la cuenta. Si estos secrets no están configurados, la notificación se omite y el workflow continúa funcionando.
+
 ---
 
 ### Paso 3: Activar el Workflow
