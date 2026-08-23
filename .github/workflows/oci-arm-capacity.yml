@@ -79,12 +79,3 @@ jobs:
       run: |
         echo "::notice::Instance created (or already present). Disabling this scheduled workflow."
         gh workflow disable "oci-arm-capacity.yml" --repo "$GITHUB_REPOSITORY"
-
-    - name: Upload log artifact
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: oci-log-${{ github.run_number }}-${{ github.run_attempt }}
-        path: |
-          *.log
-        retention-days: 7
