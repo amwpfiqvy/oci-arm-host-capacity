@@ -63,9 +63,9 @@ jobs:
         echo "OCI_PRIVATE_KEY_FILENAME=/home/runner/.oci/key.pem" >> .env
         echo "OCI_SUBNET_ID=$OCI_SUBNET_ID" >> .env
         echo "OCI_IMAGE_ID=$OCI_IMAGE_ID" >> .env
-        echo "OCI_OCPUS=2" >> .env
-        echo "OCI_MEMORY_IN_GBS=12" >> .env
-        echo "OCI_MAX_INSTANCES=2" >> .env
+        echo "OCI_OCPUS=1" >> .env
+        echo "OCI_MEMORY_IN_GBS=6" >> .env
+        echo "OCI_MAX_INSTANCES=4" >> .env
         echo "OCI_SHAPE=VM.Standard.A1.Flex" >> .env
         echo "OCI_BOOT_VOLUME_SIZE_IN_GBS=50" >> .env
         echo "OCI_SSH_PUBLIC_KEY=$OCI_SSH_PUBLIC_KEY" >> .env
