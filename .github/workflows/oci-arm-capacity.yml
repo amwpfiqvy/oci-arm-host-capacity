@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '*/6 * * * *'  # 每 6 分钟
   workflow_dispatch:
+    inputs:
+      test_email:
+        description: 'Only send a test email; do not access OCI'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: write   # 抢机成功后 gh workflow disable 需要
@@ -19,18 +25,22 @@ jobs:
 
     steps:
     - name: Checkout code
+      if: ${{ !inputs.test_email }}
       uses: actions/checkout@v4
 
     - name: Setup PHP
+      if: ${{ !inputs.test_email }}
       uses: shivammathur/setup-php@v2
       with:
         php-version: '8.1'
         extensions: curl, json, openssl
 
     - name: Install dependencies
+      if: ${{ !inputs.test_email }}
       run: composer install --no-interaction --prefer-dist --no-progress
 
     - name: Setup OCI private key
+      if: ${{ !inputs.test_email }}
       run: |
         mkdir -p ~/.oci
         printf '%s' "$OCI_PRIVATE_KEY" > ~/.oci/key.pem
@@ -39,6 +49,7 @@ jobs:
         OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
 
     - name: Create .env file
+      if: ${{ !inputs.test_email }}
       run: |
         echo "OCI_REGION=$OCI_REGION" > .env
         echo "OCI_USER_ID=$OCI_USER_ID" >> .env
@@ -63,6 +74,7 @@ jobs:
         OCI_SSH_PUBLIC_KEY: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
 
     - name: Run capacity check
+      if: ${{ !inputs.test_email }}
       id: capacity
       run: |
         set -o pipefail
@@ -76,9 +88,10 @@ jobs:
         fi
 
     - name: Send success email
-      if: steps.capacity.outputs.created == 'true'
+      if: steps.capacity.outputs.created == 'true' || inputs.test_email
       continue-on-error: true
       env:
+        TEST_EMAIL: ${{ inputs.test_email }}
         SMTP_URL: ${{ secrets.SMTP_URL }}
         SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
         SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
@@ -90,6 +103,14 @@ jobs:
           exit 0
         fi
 
+        if [ "$TEST_EMAIL" = "true" ]; then
+          EMAIL_SUBJECT="OCI ARM email notification test"
+          EMAIL_MESSAGE="This is a test email. No OCI instance operation was performed."
+        else
+          EMAIL_SUBJECT="OCI ARM instance created successfully"
+          EMAIL_MESSAGE="A new OCI ARM instance was created successfully."
+        fi
+
         curl --silent --show-error --fail --ssl-reqd \
           --url "$SMTP_URL" \
           --user "$SMTP_USERNAME:$SMTP_PASSWORD" \
@@ -98,10 +119,10 @@ jobs:
           --upload-file - <<EOF
         From: OCI ARM Capacity Checker <$SMTP_FROM>
         To: $SMTP_TO
-        Subject: OCI ARM instance created successfully
+        Subject: $EMAIL_SUBJECT
         Content-Type: text/plain; charset=UTF-8
 
-        A new OCI ARM instance was created successfully.
+        $EMAIL_MESSAGE
 
         Region: ${{ secrets.OCI_REGION }}
         Shape: VM.Standard.A1.Flex
