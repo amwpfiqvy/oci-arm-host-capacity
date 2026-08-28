@@ -72,7 +72,7 @@ class OciApi
         string $shape,
         string $sshKey,
         string $availabilityDomain,
-        string $instanceName
+        ?string $instanceName = null
     ): array
     {
         $url = "{$this->baseUrl}/20160918/instances";
@@ -81,17 +81,22 @@ class OciApi
         echo "DEBUG - Subnet ID: {$config->subnetId}\n";
         echo "DEBUG - Image ID: {$config->imageId}\n";
 
+        $displayName = $instanceName ?? 'oci-arm-' . date('Y-m-d-H-i-s');
+        $createVnicDetails = [
+            'subnetId' => $config->subnetId,
+            'assignPublicIp' => true
+        ];
+        if ($instanceName !== null) {
+            $createVnicDetails['hostnameLabel'] = $instanceName;
+        }
+
         $payload = [
             'compartmentId' => $config->tenancyId,
             'availabilityDomain' => $availabilityDomain,
             'shape' => $shape,
-            'displayName' => $instanceName,
+            'displayName' => $displayName,
             'sourceDetails' => json_decode($config->getSourceDetails(), true),
-            'createVnicDetails' => [
-                'subnetId' => $config->subnetId,
-                'assignPublicIp' => true,
-                'hostnameLabel' => $instanceName
-            ],
+            'createVnicDetails' => $createVnicDetails,
             'metadata' => [
                 'ssh_authorized_keys' => $sshKey
             ],

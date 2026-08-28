@@ -68,6 +68,18 @@ $ocpus = (int) (getenv('OCI_OCPUS') ?: '1');
 $memoryInGbs = (int) (getenv('OCI_MEMORY_IN_GBS') ?: '6');
 $maxInstances = (int) (getenv('OCI_MAX_INSTANCES') ?: '1');
 $bootVolumeSize = getenv('OCI_BOOT_VOLUME_SIZE_IN_GBS') ?: '50';
+$instanceNamePrefix = trim((string) getenv('OCI_INSTANCE_NAME_PREFIX'));
+
+if ($instanceNamePrefix !== '') {
+    if (!preg_match('/^[a-z0-9][a-z0-9-]{0,61}$/i', $instanceNamePrefix)) {
+        echo "Error: OCI_INSTANCE_NAME_PREFIX must contain only letters, numbers, and hyphens, and start with a letter or number.\n";
+        exit(1);
+    }
+    if (strlen($instanceNamePrefix) > 62) {
+        echo "Error: OCI_INSTANCE_NAME_PREFIX must be 62 characters or fewer.\n";
+        exit(1);
+    }
+}
 
 echo "OCI ARM Host Capacity Checker\n";
 echo "Region: " . getenv('OCI_REGION') . "\n";
@@ -105,50 +117,40 @@ if ($existingMsg) {
     exit(0);
 }
 
-// Assign the first available stable hostname: apq1, then apq2.
-$runningCount = 0;
-$activeCount = 0;
+// Optionally assign the first available numbered hostname (prefix1..prefix9).
+$instanceName = null;
 $usedNames = [];
 foreach ($instances as $instance) {
-    if (($instance['shape'] ?? null) !== $shape) {
-        continue;
-    }
-
     $lifecycleState = $instance['lifecycleState'] ?? null;
-    if ($lifecycleState === 'RUNNING') {
-        $runningCount++;
-    }
-    if ($lifecycleState !== 'TERMINATED') {
-        $activeCount++;
-        $recognizedName = false;
+    if ($instanceNamePrefix !== '' && $lifecycleState !== 'TERMINATED') {
         $name = $instance['displayName'] ?? '';
-        if (in_array($name, ['apq1', 'apq2'], true)) {
-            $usedNames[$name] = true;
-            $recognizedName = true;
+        if (preg_match('/^' . preg_quote($instanceNamePrefix, '/') . '[1-9]$/i', $name)) {
+            $usedNames[strtolower($name)] = true;
         }
         $hostnameLabel = $instance['createVnicDetails']['hostnameLabel'] ?? '';
-        if (in_array($hostnameLabel, ['apq1', 'apq2'], true)) {
-            $usedNames[$hostnameLabel] = true;
-            $recognizedName = true;
-        }
-        // Older instances used a date-based name; reserve their ordinal slot.
-        if (!$recognizedName && $activeCount <= 2) {
-            $usedNames['apq' . $activeCount] = true;
+        if (preg_match('/^' . preg_quote($instanceNamePrefix, '/') . '[1-9]$/i', $hostnameLabel)) {
+            $usedNames[strtolower($hostnameLabel)] = true;
         }
     }
 }
-$instanceName = null;
-foreach (['apq1', 'apq2'] as $candidate) {
-    if (!isset($usedNames[$candidate])) {
-        $instanceName = $candidate;
-        break;
+
+if ($instanceNamePrefix !== '') {
+    $instanceNamePrefix = strtolower($instanceNamePrefix);
+    for ($number = 1; $number <= 9; $number++) {
+        $candidate = $instanceNamePrefix . $number;
+        if (!isset($usedNames[$candidate])) {
+            $instanceName = $candidate;
+            break;
+        }
     }
+    if ($instanceName === null) {
+        echo "No available instance name ({$instanceNamePrefix}1-{$instanceNamePrefix}9) for a new A1 instance.\n";
+        exit(1);
+    }
+    echo "Next instance name: {$instanceName}\n";
+} else {
+    echo "Instance name: date-based default\n";
 }
-if ($instanceName === null) {
-    echo "No available instance name (apq1/apq2) for a new A1 instance.\n";
-    exit(1);
-}
-echo "Next instance name: {$instanceName}\n";
 
 // Obtener dominios de disponibilidad
 $availabilityDomains = $config->availabilityDomains;
