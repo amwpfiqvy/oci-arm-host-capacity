@@ -105,6 +105,51 @@ if ($existingMsg) {
     exit(0);
 }
 
+// Assign the first available stable hostname: apq1, then apq2.
+$runningCount = 0;
+$activeCount = 0;
+$usedNames = [];
+foreach ($instances as $instance) {
+    if (($instance['shape'] ?? null) !== $shape) {
+        continue;
+    }
+
+    $lifecycleState = $instance['lifecycleState'] ?? null;
+    if ($lifecycleState === 'RUNNING') {
+        $runningCount++;
+    }
+    if ($lifecycleState !== 'TERMINATED') {
+        $activeCount++;
+        $recognizedName = false;
+        $name = $instance['displayName'] ?? '';
+        if (in_array($name, ['apq1', 'apq2'], true)) {
+            $usedNames[$name] = true;
+            $recognizedName = true;
+        }
+        $hostnameLabel = $instance['createVnicDetails']['hostnameLabel'] ?? '';
+        if (in_array($hostnameLabel, ['apq1', 'apq2'], true)) {
+            $usedNames[$hostnameLabel] = true;
+            $recognizedName = true;
+        }
+        // Older instances used a date-based name; reserve their ordinal slot.
+        if (!$recognizedName && $activeCount <= 2) {
+            $usedNames['apq' . $activeCount] = true;
+        }
+    }
+}
+$instanceName = null;
+foreach (['apq1', 'apq2'] as $candidate) {
+    if (!isset($usedNames[$candidate])) {
+        $instanceName = $candidate;
+        break;
+    }
+}
+if ($instanceName === null) {
+    echo "No available instance name (apq1/apq2) for a new A1 instance.\n";
+    exit(1);
+}
+echo "Next instance name: {$instanceName}\n";
+
 // Obtener dominios de disponibilidad
 $availabilityDomains = $config->availabilityDomains;
 if (empty($availabilityDomains)) {
@@ -124,7 +169,7 @@ foreach ((array)$availabilityDomains as $ad) {
     echo "\nTrying availability domain: $ad\n";
     
     try {
-        $instance = $api->createInstance($config, $shape, $sshKey, $ad);
+        $instance = $api->createInstance($config, $shape, $sshKey, $ad, $instanceName);
         echo "\n✅ SUCCESS! Instance created with {$bootVolumeSize}GB disk:\n";
         echo json_encode($instance, JSON_PRETTY_PRINT) . "\n";
         exit(0);

@@ -132,6 +132,7 @@ jobs:
         Region: ${{ secrets.OCI_REGION }}
         Shape: VM.Standard.A1.Flex
         Resources: 2 OCPUs / 12 GB memory per instance (2 instances requested)
+        Instance naming: apq1 / apq2
         Repository: $GITHUB_REPOSITORY
         Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
         EOF
@@ -167,6 +168,7 @@ jobs:
         - Region: ${OCI_REGION}
         - Shape: VM.Standard.A1.Flex
         - Resources: 2 OCPUs / 12 GB memory per instance (2 instances requested)
+        - Instance naming: apq1 / apq2
         - Workflow: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
         EOF
         )

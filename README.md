@@ -129,6 +129,7 @@ Edita el archivo `.github/workflows/oci-arm-capacity.yml` si quieres cambiar:
 
 - **Frecuencia:** Línea `cron: '*/5 * * * *'` (cada 5 minutos)
 - **Recursos:** Variables `OCI_OCPUS` y `OCI_MEMORY_IN_GBS` (actualmente 4 OCPUs / 24 GB)
+- **Nombres:** las nuevas instancias usan `apq1` y `apq2` como nombre de instancia y etiqueta de hostname, generando `apq1.apqvcn.oraclevcn.com` y `apq2.apqvcn.oraclevcn.com` en la subred configurada.
 
 ---
 

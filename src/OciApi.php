@@ -67,7 +67,13 @@ class OciApi
         return null;
     }
 
-    public function createInstance(OciConfig $config, string $shape, string $sshKey, string $availabilityDomain): array
+    public function createInstance(
+        OciConfig $config,
+        string $shape,
+        string $sshKey,
+        string $availabilityDomain,
+        string $instanceName
+    ): array
     {
         $url = "{$this->baseUrl}/20160918/instances";
         
@@ -79,11 +85,12 @@ class OciApi
             'compartmentId' => $config->tenancyId,
             'availabilityDomain' => $availabilityDomain,
             'shape' => $shape,
-            'displayName' => 'oci-arm-' . date('Y-m-d-H-i-s'),
+            'displayName' => $instanceName,
             'sourceDetails' => json_decode($config->getSourceDetails(), true),
             'createVnicDetails' => [
                 'subnetId' => $config->subnetId,
-                'assignPublicIp' => true
+                'assignPublicIp' => true,
+                'hostnameLabel' => $instanceName
             ],
             'metadata' => [
                 'ssh_authorized_keys' => $sshKey
