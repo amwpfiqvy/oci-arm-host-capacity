@@ -1,4 +1,4 @@
-"""Task Scheduler entry: log start/end, then run the watchdog."""
+"""Task Scheduler entry: log start/end, then run the grabber."""
 from __future__ import annotations
 
 import runpy
@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 LOG = ROOT / "logs" / "task-run.log"
-SCRIPT = ROOT / "oci_workflow_watchdog.py"
+SCRIPT = ROOT / "oci_grabber.py"
 
 
 def _log(message: str) -> None:

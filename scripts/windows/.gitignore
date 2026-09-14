@@ -2,3 +2,7 @@
 logs/
 __pycache__/
 *.pyc
+token
+*.token
+.env
+*.pem

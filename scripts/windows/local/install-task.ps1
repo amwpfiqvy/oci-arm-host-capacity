@@ -1,17 +1,20 @@
-# Register OCI-ARM-Watchdog. ASCII only (Windows PowerShell 5.x).
+# Register OCI-ARM-Grabber. ASCII only (Windows PowerShell 5.x).
 # Run from an elevated or same-user interactive session:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File .\install-task.ps1
+# Requires .env (copy .env.example) and the OCI private key in this dir.
 $ErrorActionPreference = 'Stop'
 $Root = $PSScriptRoot
-$TaskName = 'OCI-ARM-Watchdog'
+$TaskName = 'OCI-ARM-Grabber'
 $VenvDir = Join-Path $Root '.venv'
 $VenvPython = Join-Path $VenvDir 'Scripts\python.exe'
-$Vbs = Join-Path $Root 'run_watchdog.vbs'
-$Watchdog = Join-Path $Root 'oci_workflow_watchdog.py'
+$Vbs = Join-Path $Root 'run_grabber.vbs'
+$Watchdog = Join-Path $Root 'oci_grabber.py'
+$EnvFile = Join-Path $Root '.env'
 $UserId = "$env:USERDOMAIN\$env:USERNAME"
 
 if (-not (Test-Path $Watchdog)) { throw "missing $Watchdog" }
 if (-not (Test-Path $Vbs)) { throw "missing $Vbs" }
+if (-not (Test-Path $EnvFile)) { throw "missing $EnvFile (copy .env.example and fill in)" }
 
 function Invoke-Uv {
     param([Parameter(Mandatory=$true)][string[]]$UvArgs)
@@ -24,15 +27,15 @@ function Invoke-Uv {
 if (-not (Test-Path $VenvPython)) {
     Invoke-Uv @('venv', $VenvDir, '--python', '3.14')
 }
-Invoke-Uv @('pip', 'install', '--python', $VenvPython, 'websockets')
+Invoke-Uv @('pip', 'install', '--python', $VenvPython, 'cryptography')
 
-$XmlPath = Join-Path $env:TEMP 'OCI-ARM-Watchdog.task.xml'
+$XmlPath = Join-Path $env:TEMP 'OCI-ARM-Grabber.task.xml'
 $Xml = @"
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
     <Author>$UserId</Author>
-    <Description>OCI ARM GitHub workflow watchdog via Chrome CDP 127.0.0.1:9222. Hidden via wscript.</Description>
+    <Description>OCI ARM capacity grabber calling OCI API directly. Hidden via wscript. Auto-disables itself on success.</Description>
     <URI>\$TaskName</URI>
   </RegistrationInfo>
   <Triggers>
