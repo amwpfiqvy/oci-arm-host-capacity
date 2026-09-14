@@ -361,8 +361,9 @@ def run(dry_run: bool) -> str:
                 + extra
             )
         message = data.get("message") if isinstance(data, dict) else str(data)
-        lines.append(f"Failed in {ad}: {message}")
-        if message and "Out of host capacity" in str(message):
+        lines.append(f"Failed in {ad} HTTP {status}: {message}")
+        # Capacity and rate-limit are expected; retry next interval.
+        if status == 429 or (message and "Out of host capacity" in str(message)):
             time.sleep(2)
             continue
         raise GrabberError(f"创建实例失败 HTTP {status}：{message}")
